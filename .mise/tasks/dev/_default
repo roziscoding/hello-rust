@@ -1,0 +1,4 @@
+#!/usr/bin/env zsh
+#MISE description="Runs the development watch mode with bacon"
+
+bacon run-long

@@ -1,0 +1,4 @@
+[tools]
+"cargo:bacon" = "latest"
+rust = "latest"
+watchexec = "latest"

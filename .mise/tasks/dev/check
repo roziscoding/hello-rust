@@ -1,0 +1,4 @@
+#!/usr/bin/env zsh
+#MISE description="Run check and clippy"
+
+cargo clippy -- -W clippy::pedantic

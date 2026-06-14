@@ -1,0 +1,4 @@
+#!/usr/bin/env zsh
+#MISE description="Run tests with bacon to watch for changes"
+
+bacon test
