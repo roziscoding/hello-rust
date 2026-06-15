@@ -1,0 +1,4 @@
+#!/usr/bin/env zsh
+#MISE description="Run the server once (no watch) on 127.0.0.1:3000"
+
+cargo run "$@"

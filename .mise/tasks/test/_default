@@ -1,4 +1,4 @@
 #!/usr/bin/env zsh
-#MISE description="Run cargo test"
+#MISE description="Run cargo test (pass a name to filter: mise run test <name>)"
 
-cargo test
+cargo test "$@"
