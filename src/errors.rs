@@ -8,7 +8,7 @@ use validator::ValidationErrors;
 
 pub enum AppError {
     NotFound(String),
-    Validation(validator::ValidationErrors),
+    Validation(ValidationErrors),
 }
 
 impl AppError {
