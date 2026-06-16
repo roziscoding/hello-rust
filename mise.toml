@@ -1,4 +1,8 @@
 [tools]
 "cargo:bacon" = "latest"
+"cargo:sea-orm-cli" = "latest"
 rust = "latest"
 watchexec = "latest"
+
+[env]
+_.file = ".env"

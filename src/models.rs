@@ -1,14 +1,5 @@
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
+use serde::Deserialize;
 use validator::Validate;
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct Friend {
-    pub id: Uuid,
-    pub name: String,
-    pub pronouns: String,
-    pub notes: Option<String>,
-}
 
 #[derive(Deserialize, Validate)]
 pub struct NewFriend {

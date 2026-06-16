@@ -1,0 +1,4 @@
+#!/usr/bin/env zsh
+#MISE description="Build the release profile"
+
+cargo build --workspace --release

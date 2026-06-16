@@ -1,0 +1,4 @@
+#!/usr/bin/env zsh
+#MISE description="Rollback migrations with sea-orm-cli."
+
+sea-orm-cli migrate down

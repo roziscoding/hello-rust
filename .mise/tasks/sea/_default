@@ -1,0 +1,4 @@
+#!/usr/bin/env zsh
+#MISE description = "Run sea-orm-cli. Forwards all arguments to it."
+
+sea-orm-cli $@

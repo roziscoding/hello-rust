@@ -1,1 +1,7 @@
 /target
+friends.db
+friends.db-shm
+friends.db-wal
+.env
+.env.*
+!.env.sample

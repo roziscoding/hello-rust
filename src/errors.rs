@@ -3,12 +3,14 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+use sea_orm::DbErr;
 use serde::Serialize;
 use validator::ValidationErrors;
 
 pub enum AppError {
     NotFound(String),
     Validation(ValidationErrors),
+    Internal,
 }
 
 impl AppError {
@@ -50,6 +52,14 @@ impl IntoResponse for AppError {
                     details: Some(errors),
                 },
             ),
+            AppError::Internal => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                JsonError {
+                    code: "INTERNAL_SERVER_ERROR".to_string(),
+                    message: "server encountered an unexpected error".to_string(),
+                    details: None
+                }
+            )
         }
         .into_response();
     }
@@ -58,5 +68,12 @@ impl IntoResponse for AppError {
 impl From<ValidationErrors> for AppError {
     fn from(errors: ValidationErrors) -> Self {
         return AppError::Validation(errors);
+    }
+}
+
+impl From<DbErr> for AppError {
+    fn from(value: DbErr) -> Self {
+        tracing::error!(error = %value, "database operation failed");
+        return AppError::Internal; 
     }
 }

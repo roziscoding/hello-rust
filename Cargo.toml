@@ -9,6 +9,14 @@ tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 validator = { version = "0.20", features = ["derive"] }
+sea-orm = { version = "1.1", features = ["sqlx-sqlite", "runtime-tokio-rustls", "macros", "with-uuid"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tower-http = { version = "0.6", features = ["trace"] }
 
 [lints.clippy]
 needless_return = "allow"
+
+[workspace]
+resolver = "3"
+members = ["migration"]

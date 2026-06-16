@@ -1,0 +1,4 @@
+#!/usr/bin/env zsh
+#MISE description="Build the project"
+
+cargo build --workspace

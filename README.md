@@ -1,20 +1,44 @@
 # hello-rust
 
-A small in-memory **friends CRUD REST API**, built as a hands-on project for learning Rust. No database — data lives in process memory and resets on restart.
+A small **friends CRUD REST API**, built as a hands-on project for learning Rust. Data is **persisted to SQLite** via an ORM, so it survives restarts.
 
-Built with [axum](https://github.com/tokio-rs/axum) + [tokio](https://tokio.rs), with `serde` for JSON, `validator` for input validation, and `uuid` for IDs. Rust edition 2024.
+Built with [axum](https://github.com/tokio-rs/axum) + [tokio](https://tokio.rs), with [SeaORM](https://www.sea-ql.org/SeaORM/) for persistence, `serde` for JSON, `validator` for input validation, `uuid` for IDs, and `tracing` + `tower-http` for structured request logging. Rust edition 2024.
 
 ## Requirements
 
-- Rust (edition 2024). Toolchain and dev tools are pinned via [`mise`](https://mise.jdx.dev/) in `mise.toml` — run `mise install` to set up `rust`, `bacon`, and `watchexec`.
+- Rust (edition 2024). Toolchain and dev tools are pinned via [`mise`](https://mise.jdx.dev/) in `mise.toml` — run `mise install` to set up `rust`, `bacon`, `watchexec`, and `sea-orm-cli`.
+- A `DATABASE_URL` pointing at a SQLite file. Copy `.env.sample` to `.env` (default: `sqlite://friends.db?mode=rwc`); `mise` loads it automatically (`[env] _.file = ".env"`).
 
 ## Running
 
 ```sh
+cp .env.sample .env  # provides DATABASE_URL
+mise install         # toolchain + sea-orm-cli
+mise run db:migrate  # create friends.db and apply migrations
 mise run dev         # starts the server on http://127.0.0.1:3000 (watch mode)
 ```
 
-This project uses [`mise`](https://mise.jdx.dev/) tasks for everything — see [Development](#development). Run `mise install` first to set up the toolchain.
+This project uses [`mise`](https://mise.jdx.dev/) tasks for everything — see [Development](#development).
+
+### Logging
+
+Logging is via `tracing`. The default filter is `info,sqlx=warn` (HTTP requests log at `INFO`; SQL is muted). Override per run:
+
+```sh
+RUST_LOG=debug,sqlx=warn mise run start   # verbose app + HTTP, SQL still quiet
+```
+
+## Database & migrations
+
+Persistence is SeaORM over SQLite. The schema is defined **in Rust** (no handwritten SQL) inside the separate `migration/` crate, using the schema-builder DSL.
+
+| Command                | What it does                          |
+| ---------------------- | ------------------------------------- |
+| `mise run db:migrate`  | Apply pending migrations              |
+| `mise run db:rollback` | Roll back the last migration          |
+| `mise run sea <args>`  | Run `sea-orm-cli` (e.g. `migrate status`) |
+
+The `friends` table maps to the `entities::friend` entity. UUIDs are stored as a 16-byte BLOB (SeaORM maps `Uuid` ↔ bytes; SQLite's dynamic typing allows it in the `uuid_text`-affinity column).
 
 ## API
 
@@ -33,11 +57,11 @@ A friend has the shape:
 
 | Method   | Path             | Description                       | Success      | Errors |
 | -------- | ---------------- | --------------------------------- | ------------ | ------ |
-| `GET`    | `/friends`       | List all friends                  | `200` + array | — |
-| `POST`   | `/friends`       | Create a friend                   | `200` + friend | `422` invalid body |
-| `GET`    | `/friends/{id}`  | Fetch one friend                  | `200` + friend | `404` not found |
-| `PUT`    | `/friends/{id}`  | Replace a friend (all fields)     | `200` + friend | `404` not found, `422` invalid body |
-| `DELETE` | `/friends/{id}`  | Delete a friend (idempotent)      | `204` no content | — |
+| `GET`    | `/friends`       | List all friends                  | `200` + array | `500` |
+| `POST`   | `/friends`       | Create a friend                   | `200` + friend | `422` invalid body, `500` |
+| `GET`    | `/friends/{id}`  | Fetch one friend                  | `200` + friend | `404` not found, `500` |
+| `PUT`    | `/friends/{id}`  | Replace a friend (all fields)     | `200` + friend | `404` not found, `422` invalid body, `500` |
+| `DELETE` | `/friends/{id}`  | Delete a friend (idempotent)      | `204` no content | `500` |
 
 The request body for `POST`/`PUT` is `{ "name", "pronouns", "notes?" }` (no `id`).
 
@@ -66,7 +90,7 @@ curl -X DELETE http://127.0.0.1:3000/friends/<id>
 
 ### Error responses
 
-Errors return a consistent JSON envelope. Validation failures (`422`) include per-field `details`:
+Errors return a consistent JSON envelope. Validation failures (`422`) include per-field `details`; database failures return a generic `500` (the real error is logged server-side, never leaked to the client):
 
 ```json
 {
@@ -78,24 +102,33 @@ Errors return a consistent JSON envelope. Validation failures (`422`) include pe
 
 ## Development
 
-| Command            | What it does                          |
-| ------------------ | ------------------------------------- |
-| `mise run dev`     | Run the server in watch mode (bacon)  |
-| `mise run start`   | Run the server once (no watch)        |
-| `mise run dev:check` | Lint with clippy (pedantic)         |
-| `mise run test`    | Run the test suite                    |
-| `mise run test <name>` | Run a single test by name         |
-| `mise run test:watch` | Run tests in watch mode            |
+| Command                | What it does                          |
+| ---------------------- | ------------------------------------- |
+| `mise run dev`         | Run the server in watch mode (bacon)  |
+| `mise run start`       | Run the server once (no watch)        |
+| `mise run build`       | Build the workspace                   |
+| `mise run build:release` | Build the release profile           |
+| `mise run dev:check`   | Lint the workspace with clippy (pedantic) |
+| `mise run test`        | Run the test suite                    |
+| `mise run test <name>` | Run a single test by name             |
+| `mise run test:watch`  | Run tests in watch mode               |
+| `mise run db:migrate`  | Apply migrations                      |
+| `mise run db:rollback` | Roll back the last migration          |
+| `mise run sea <args>`  | Run `sea-orm-cli`                      |
 
-This project uses `mise` tasks exclusively — avoid invoking `cargo`/`bacon` directly.
+This project uses `mise` tasks exclusively — avoid invoking `cargo`/`bacon`/`sea-orm-cli` directly.
 
 ## Project structure
 
 ```
 src/
-├── main.rs         router + server setup, state wiring
-├── models.rs       Friend (stored) and NewFriend (request body) types
-├── handlers.rs     HTTP handlers — validate, then delegate to the repository
-├── repository.rs   FriendRepository — owns the in-memory store, all lock logic
-└── errors.rs       AppError + JSON error responses
+├── main.rs          router + server setup, DB connection, tracing, state wiring
+├── models.rs        NewFriend (request body) type + validation rules
+├── handlers.rs      HTTP handlers — validate, then delegate to the repository
+├── repository.rs    FriendRepository — owns the DatabaseConnection, all queries
+├── errors.rs        AppError + JSON error responses (404 / 422 / 500)
+└── entities/
+    └── friend.rs    SeaORM entity: Model / ActiveModel + Friend::new constructor
+
+migration/           separate crate: the friends table, defined in Rust (no SQL)
 ```
