@@ -14,6 +14,16 @@ pub struct Friend {
 }
 
 impl Friend {
+    fn value_for(&self, column: &FriendColumn) -> SimpleExpr {
+        return match column {
+            FriendColumn::Id => self.id.into(),
+            FriendColumn::Name => self.name.clone().into(),
+            FriendColumn::Pronouns => self.pronouns.clone().into(),
+            FriendColumn::Notes => self.notes.clone().into(),
+            FriendColumn::Table => unreachable!("Table is not a valid column"),
+        };
+    }
+
     pub fn new(id: Uuid, params: NewFriend) -> Self {
         return Friend {
             id,
@@ -23,37 +33,38 @@ impl Friend {
         };
     }
 
-    pub fn into_insert_tuple(self) -> (Vec<Friends>, Vec<SimpleExpr>) {
-        return (
-            vec![
-                Friends::Id,
-                Friends::Name,
-                Friends::Pronouns,
-                Friends::Notes,
-            ],
-            vec![
-                self.id.into(),
-                self.name.into(),
-                self.pronouns.into(),
-                self.notes.into(),
-            ],
-        );
+    pub fn into_insert_tuple(self) -> (Vec<FriendColumn>, Vec<SimpleExpr>) {
+        let columns = FriendColumn::columns();
+        let values = columns.iter().map(|c| self.value_for(c)).collect();
+        return (columns, values);
     }
 
-    pub fn into_update_tuples(self) -> Vec<(Friends, SimpleExpr)> {
-        return vec![
-            (Friends::Name, self.name.into()),
-            (Friends::Pronouns, self.pronouns.into()),
-            (Friends::Notes, self.notes.into()),
-        ];
+    pub fn into_update_tuples(self) -> Vec<(FriendColumn, SimpleExpr)> {
+        return FriendColumn::columns()
+            .into_iter()
+            .filter(|col| !matches!(col, FriendColumn::Id))
+            .map(|c| (c, self.value_for(&c)))
+            .collect();
     }
 }
 
-#[derive(Iden)]
-pub enum Friends {
+#[derive(Iden, Clone, Copy)]
+pub enum FriendColumn {
+    #[iden = "friends"]
     Table,
     Id,
     Name,
     Pronouns,
     Notes,
+}
+
+impl FriendColumn {
+    pub fn columns() -> Vec<FriendColumn> {
+        return vec![
+            FriendColumn::Id,
+            FriendColumn::Name,
+            FriendColumn::Pronouns,
+            FriendColumn::Notes,
+        ];
+    }
 }

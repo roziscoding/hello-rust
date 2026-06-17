@@ -1,4 +1,4 @@
-use crate::db::entities::friend::{Friend, Friends};
+use crate::db::entities::friend::{Friend, FriendColumn};
 
 use sea_query::{Expr, Query, SqliteQueryBuilder};
 use sea_query_binder::SqlxBinder;
@@ -41,15 +41,18 @@ impl FriendRepository {
 
     pub async fn list(&self) -> Result<Vec<Friend>, SqlxError> {
         let mut query = Query::select();
-        query.from(Friends::Table);
+        query
+            .from(FriendColumn::Table)
+            .columns(FriendColumn::columns());
         return self.fetch_all(&query).await;
     }
 
     pub async fn get(&self, id: Uuid) -> Result<Option<Friend>, SqlxError> {
         let mut query = Query::select();
         query
-            .from(Friends::Table)
-            .and_where(Expr::col(Friends::Id).eq(id))
+            .from(FriendColumn::Table)
+            .columns(FriendColumn::columns())
+            .and_where(Expr::col(FriendColumn::Id).eq(id))
             .limit(1);
 
         return self.fetch_optional(&query).await;
@@ -58,9 +61,8 @@ impl FriendRepository {
     pub async fn delete(&self, id: Uuid) -> Result<SqliteQueryResult, SqlxError> {
         let mut query = Query::delete();
         query
-            .from_table(Friends::Table)
-            .and_where(Expr::column(Friends::Id).eq(id))
-            .returning_all();
+            .from_table(FriendColumn::Table)
+            .and_where(Expr::column(FriendColumn::Id).eq(id));
 
         return self.execute(&query).await;
     }
@@ -70,7 +72,7 @@ impl FriendRepository {
 
         let mut query = Query::insert();
         query
-            .into_table(Friends::Table)
+            .into_table(FriendColumn::Table)
             .columns(columns)
             .values_panic(values)
             .returning_all();
@@ -82,7 +84,10 @@ impl FriendRepository {
         let values = Friend::new(id, params).into_update_tuples();
 
         let mut query = Query::update();
-        query.table(Friends::Table).values(values).returning_all();
+        query
+            .table(FriendColumn::Table)
+            .values(values)
+            .returning_all();
 
         return self.fetch_optional(&query).await;
     }
