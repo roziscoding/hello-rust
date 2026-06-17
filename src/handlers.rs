@@ -7,9 +7,9 @@ use axum::{
 use uuid::Uuid;
 use validator::Validate;
 
-use crate::entities::Friend;
+use crate::db::entities::friend::Friend;
 use crate::errors::AppError;
-use crate::{models::NewFriend, repository::FriendRepository};
+use crate::{db::repository::FriendRepository, models::NewFriend};
 
 pub async fn list_friends(
     State(repository): State<FriendRepository>,
@@ -37,7 +37,6 @@ pub async fn get_friend(
         .ok_or_else(|| AppError::not_found(format!("friend with ID {id} not found")));
 }
 
-// We return 204 unconditionally because DELETE is indempotent
 pub async fn delete_friend(
     State(repository): State<FriendRepository>,
     Path(id): Path<Uuid>,

@@ -1,17 +1,16 @@
-mod entities;
+mod db;
 mod errors;
 mod handlers;
 mod models;
-mod repository;
 
 use axum::{Router, routing::get};
-use sea_orm::Database;
+use sqlx::Pool;
 use tokio::net::TcpListener;
 use tower_http::trace::{DefaultMakeSpan, DefaultOnRequest, DefaultOnResponse, TraceLayer};
 use tracing::Level;
 use tracing_subscriber::EnvFilter;
 
-use crate::repository::FriendRepository;
+use crate::db::repository::FriendRepository;
 
 #[tokio::main]
 async fn main() {
@@ -22,9 +21,10 @@ async fn main() {
         .init();
 
     let url = std::env::var("DATABASE_URL").expect("DATABASE_URL environment variable is required");
-    let connection = Database::connect(url)
+    let connection = Pool::connect(&url)
         .await
-        .expect("failed to connect to the database");
+        .expect("could not connect to the database");
+
     let state = FriendRepository::new(connection);
 
     let app = Router::new()

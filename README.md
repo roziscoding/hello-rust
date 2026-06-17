@@ -1,8 +1,8 @@
 # hello-rust
 
-A small **friends CRUD REST API**, built as a hands-on project for learning Rust. Data is **persisted to SQLite** via an ORM, so it survives restarts.
+A small **friends CRUD REST API**, built as a hands-on project for learning Rust. Data is **persisted to SQLite**, so it survives restarts.
 
-Built with [axum](https://github.com/tokio-rs/axum) + [tokio](https://tokio.rs), with [SeaORM](https://www.sea-ql.org/SeaORM/) for persistence, `serde` for JSON, `validator` for input validation, `uuid` for IDs, and `tracing` + `tower-http` for structured request logging. Rust edition 2024.
+Built with [axum](https://github.com/tokio-rs/axum) + [tokio](https://tokio.rs), with [`sqlx`](https://github.com/launchbadge/sqlx) as the SQLite driver and [SeaQuery](https://www.sea-ql.org/SeaQuery/) as the query builder (queries are built in Rust, not handwritten SQL), `serde` for JSON, `validator` for input validation, `uuid` for IDs, and `tracing` + `tower-http` for structured request logging. Rust edition 2024.
 
 ## Requirements
 
@@ -30,7 +30,7 @@ RUST_LOG=debug,sqlx=warn mise run start   # verbose app + HTTP, SQL still quiet
 
 ## Database & migrations
 
-Persistence is SeaORM over SQLite. The schema is defined **in Rust** (no handwritten SQL) inside the separate `migration/` crate, using the schema-builder DSL.
+Persistence is `sqlx` + SeaQuery over SQLite — queries are built in Rust, with `sqlx` executing them. The schema is defined **in Rust** (no handwritten SQL) inside the separate `migration/` crate, using SeaQuery's schema-builder DSL, and applied via `sea-orm-cli`.
 
 | Command                | What it does                          |
 | ---------------------- | ------------------------------------- |
@@ -38,7 +38,7 @@ Persistence is SeaORM over SQLite. The schema is defined **in Rust** (no handwri
 | `mise run db:rollback` | Roll back the last migration          |
 | `mise run sea <args>`  | Run `sea-orm-cli` (e.g. `migrate status`) |
 
-The `friends` table maps to the `entities::friend` entity. UUIDs are stored as a 16-byte BLOB (SeaORM maps `Uuid` ↔ bytes; SQLite's dynamic typing allows it in the `uuid_text`-affinity column).
+The `friends` table maps to the `db::entities::friend::Friend` struct (decoded from rows via `sqlx::FromRow`). UUIDs are stored as a 16-byte BLOB (`sqlx` maps `Uuid` ↔ bytes; SQLite's dynamic typing allows it regardless of the column's declared affinity).
 
 ## API
 
@@ -122,13 +122,14 @@ This project uses `mise` tasks exclusively — avoid invoking `cargo`/`bacon`/`s
 
 ```
 src/
-├── main.rs          router + server setup, DB connection, tracing, state wiring
+├── main.rs          router + server setup, DB pool, tracing, state wiring
 ├── models.rs        NewFriend (request body) type + validation rules
 ├── handlers.rs      HTTP handlers — validate, then delegate to the repository
-├── repository.rs    FriendRepository — owns the DatabaseConnection, all queries
 ├── errors.rs        AppError + JSON error responses (404 / 422 / 500)
-└── entities/
-    └── friend.rs    SeaORM entity: Model / ActiveModel + Friend::new constructor
+└── db/              persistence layer
+    ├── repository.rs  FriendRepository — owns the SqlitePool, builds + runs queries
+    └── entities/
+        └── friend.rs  Friend struct (sqlx::FromRow) + Friends column Iden + query-tuple helpers
 
 migration/           separate crate: the friends table, defined in Rust (no SQL)
 ```
