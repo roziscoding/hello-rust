@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use validator::Validate;
 
-#[derive(Deserialize, Validate)]
+#[derive(Deserialize, Validate, Clone)]
 pub struct NewFriend {
     #[validate(length(min = 1, message = "name cannot be empty"))]
     pub name: String,

@@ -93,88 +93,124 @@ impl FriendRepository {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use migration::{Migrator, MigratorTrait};
+    use sea_orm::SqlxSqliteConnector;
+    use sqlx::sqlite::SqlitePoolOptions;
 
-//     fn make_friend() -> (Uuid, Friend) {
-//         let id = Uuid::new_v4();
-//         let friend = Friend {
-//             id,
-//             name: "Friend".into(),
-//             pronouns: "Pronouns".into(),
-//             notes: None,
-//         };
+    async fn setup() -> FriendRepository {
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .expect("failed to open in-memory db");
 
-//         return (id, friend);
-//     }
+        let conn = SqlxSqliteConnector::from_sqlx_sqlite_pool(pool.clone());
+        Migrator::up(&conn, None).await.expect("migration failed");
 
-//     #[test]
-//     fn it_lists_friends() {
-//         let mut friends: HashMap<Uuid, Friend> = HashMap::new();
-//         let (uuid, friend) = make_friend();
-//         friends.insert(uuid, friend);
+        return FriendRepository::new(pool);
+    }
 
-//         let repo = FriendRepository::seed(friends);
-//         let friends = repo.list();
-//         assert_eq!(friends.len(), 1);
-//     }
+    fn make_friend_params() -> NewFriend {
+        return NewFriend {
+            name: "Friend".into(),
+            pronouns: "Pronouns".into(),
+            notes: None,
+        };
+    }
 
-//     #[test]
-//     fn it_adds_a_friend() {
-//         let repo = FriendRepository::new();
+    #[tokio::test]
+    async fn it_stores_uuids_correctly() {
+        let repo = setup().await;
 
-//         let new_friend = repo.add(NewFriend {
-//             name: "Test friend".into(),
-//             pronouns: "Test Pronouns".into(),
-//             notes: None,
-//         });
+        let new_friend = make_friend_params();
+        let inserted_friend = repo
+            .add(new_friend.clone())
+            .await
+            .expect("cannot create friend");
 
-//         assert_eq!(new_friend.name, "Test friend");
+        let retrieved_friend = repo
+            .get(inserted_friend.id)
+            .await
+            .expect("cannot retrieve friend")
+            .expect("friend not found");
 
-//         let friend = repo.get(&new_friend.id);
+        assert_eq!(retrieved_friend.name, new_friend.name);
+    }
 
-//         assert!(friend.is_some());
-//         assert_eq!(friend.unwrap().name, "Test friend");
-//     }
+    #[tokio::test]
+    async fn list_returns_all_friends() {
+        let repo = setup().await;
 
-//     #[test]
-//     fn update_returns_none_on_wrong_id() {
-//         let repo = FriendRepository::new();
+        repo.add(make_friend_params())
+            .await
+            .expect("cannot create friend");
+        repo.add(make_friend_params())
+            .await
+            .expect("cannot create friend");
 
-//         let result = repo.update(
-//             &Uuid::new_v4(),
-//             NewFriend {
-//                 name: String::new(),
-//                 pronouns: String::new(),
-//                 notes: None,
-//             },
-//         );
+        let friends = repo.list().await.expect("cannot list friends");
 
-//         assert!(result.is_none());
-//     }
+        assert_eq!(friends.len(), 2);
+    }
 
-//     #[test]
-//     fn it_updates_when_called_correctly() {
-//         let (uuid, friend) = make_friend();
-//         let mut friends: HashMap<Uuid, Friend> = HashMap::new();
-//         friends.insert(uuid, friend);
-//         let repo = FriendRepository::seed(friends);
+    #[tokio::test]
+    async fn update_changes_the_stored_fields() {
+        let repo = setup().await;
 
-//         repo.update(
-//             &uuid,
-//             NewFriend {
-//                 name: "Updated".into(),
-//                 pronouns: "Updated".into(),
-//                 notes: Some("Present".into()),
-//             },
-//         );
+        let inserted = repo
+            .add(make_friend_params())
+            .await
+            .expect("cannot create friend");
 
-//         let updated_friend = repo.get(&uuid).unwrap();
+        let updated = repo
+            .update(
+                inserted.id,
+                NewFriend {
+                    name: "Updated".into(),
+                    pronouns: "they/them".into(),
+                    notes: Some("Present".into()),
+                },
+            )
+            .await
+            .expect("cannot update friend")
+            .expect("friend not found");
 
-//         assert!(updated_friend.notes.is_some());
-//         assert_eq!(updated_friend.notes.unwrap(), "Present");
-//         assert_eq!(updated_friend.name, "Updated");
-//         assert_eq!(updated_friend.pronouns, "Updated");
-//     }
-// }
+        assert_eq!(updated.id, inserted.id);
+        assert_eq!(updated.name, "Updated");
+        assert_eq!(updated.pronouns, "they/them");
+        assert_eq!(updated.notes.as_deref(), Some("Present"));
+    }
+
+    #[tokio::test]
+    async fn update_returns_none_for_unknown_id() {
+        let repo = setup().await;
+
+        let result = repo
+            .update(Uuid::new_v4(), make_friend_params())
+            .await
+            .expect("update should not error");
+
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn delete_removes_the_friend() {
+        let repo = setup().await;
+
+        let inserted = repo
+            .add(make_friend_params())
+            .await
+            .expect("cannot create friend");
+
+        repo.delete(inserted.id)
+            .await
+            .expect("cannot delete friend");
+
+        let retrieved = repo.get(inserted.id).await.expect("cannot retrieve friend");
+
+        assert!(retrieved.is_none());
+    }
+}

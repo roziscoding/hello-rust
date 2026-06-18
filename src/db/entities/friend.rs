@@ -14,7 +14,7 @@ pub struct Friend {
 }
 
 impl Friend {
-    fn value_for(&self, column: &FriendColumn) -> SimpleExpr {
+    fn value_for(&self, column: FriendColumn) -> SimpleExpr {
         return match column {
             FriendColumn::Id => self.id.into(),
             FriendColumn::Name => self.name.clone().into(),
@@ -35,7 +35,7 @@ impl Friend {
 
     pub fn into_insert_tuple(self) -> (Vec<FriendColumn>, Vec<SimpleExpr>) {
         let columns = FriendColumn::columns();
-        let values = columns.iter().map(|c| self.value_for(c)).collect();
+        let values = columns.iter().map(|c| self.value_for(*c)).collect();
         return (columns, values);
     }
 
@@ -43,7 +43,7 @@ impl Friend {
         return FriendColumn::columns()
             .into_iter()
             .filter(|col| !matches!(col, FriendColumn::Id))
-            .map(|c| (c, self.value_for(&c)))
+            .map(|c| (c, self.value_for(c)))
             .collect();
     }
 }
